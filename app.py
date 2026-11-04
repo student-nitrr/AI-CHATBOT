@@ -18,6 +18,16 @@ from styles import inject_css
 
 load_dotenv()
 
+# Load Streamlit Community Cloud secrets when the app is deployed.
+# Local runs can continue using the .env file.
+try:
+    for key in ("USE_OPENAI", "OPENAI_API_KEY", "OPENAI_MODEL"):
+        if key in st.secrets:
+            os.environ[key] = str(st.secrets[key])
+except Exception:
+    # Streamlit secrets may not be configured during local development.
+    pass
+
 st.set_page_config(
     page_title="TaskBot AI",
     page_icon="🤖",
