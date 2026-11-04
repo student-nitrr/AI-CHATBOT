@@ -466,15 +466,33 @@ def _demo_agent(message: str, fallback_reason: str | None = None) -> AgentResult
         )
 
 
-def process_message(message: str) -> AgentResult:
-    """Choose real OpenAI mode or the free local demo agent."""
-    use_openai = os.getenv("USE_OPENAI", "false").strip().lower() == "true"
-    has_key = bool(os.getenv("OPENAI_API_KEY", "").strip())
+def process_message(message: str, mode: str = "Demo Mode") -> AgentResult:
+    """Run the mode explicitly selected in the Streamlit sidebar."""
+    if mode == "AI Mode":
+        if not os.getenv("OPENAI_API_KEY", "").strip():
+            return AgentResult(
+                reply=(
+                    "⚠️ **OpenAI API key is missing.** Add your key to the "
+                    "`.env` file as `OPENAI_API_KEY=your_key_here`, then "
+                    "restart the app and select AI Mode again."
+                ),
+                activity=["AI Mode selected", "API key not found"],
+                mode="OpenAI · Not configured",
+            )
 
-    if use_openai and has_key:
         try:
             return _openai_agent(message)
         except Exception as error:
-            return _demo_agent(message, fallback_reason=str(error))
+            return AgentResult(
+                reply=(
+                    "⚠️ **Could not connect to OpenAI.** Your request was not "
+                    "run in Demo Mode. Check that your API key is valid, your "
+                    "account has API billing/credits available, and the model "
+                    "name in `.env` is supported.\n\n"
+                    f"**Error details:** {error}"
+                ),
+                activity=["AI Mode selected", "OpenAI request failed"],
+                mode="OpenAI · Error",
+            )
 
     return _demo_agent(message)
