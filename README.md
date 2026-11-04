@@ -73,9 +73,11 @@ cp .env.example .env
 streamlit run app.py
 ```
 
-## Enable OpenAI mode
+## Configure OpenAI AI Mode
 
-Open `.env` and change:
+1. Create an API key from [OpenAI API keys](https://platform.openai.com/api-keys).
+2. Open the `.env` file in the project root.
+3. Add your key and model configuration:
 
 ```env
 USE_OPENAI=true
@@ -83,9 +85,12 @@ OPENAI_API_KEY=your_real_key_here
 OPENAI_MODEL=gpt-5.4-mini
 ```
 
-Restart Streamlit after changing `.env`.
+4. Save the file and restart Streamlit.
+5. In the sidebar, select **AI Mode**. Select **Demo Mode** whenever you want to use the free local intent detector.
 
-Never upload `.env` to GitHub.
+The app remembers the selected mode while the Streamlit session is active. If AI Mode is selected without a key, the app shows a setup warning. If an OpenAI request fails, it displays the error instead of silently running the request in Demo Mode.
+
+Never upload `.env` to GitHub or share your API key. API usage may incur separate charges; a ChatGPT subscription does not include API usage.
 
 ## Project files
 
