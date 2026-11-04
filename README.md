@@ -83,7 +83,7 @@ streamlit run app.py
 ```env
 AI_PROVIDER=groq
 GROQ_API_KEY=your_real_groq_key_here
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=openai/gpt-oss-120b
 ```
 
 4. Install the dependencies with `pip install -r requirements.txt`.
@@ -96,7 +96,7 @@ Open your app's **Manage app → Settings → Secrets** and add:
 ```toml
 AI_PROVIDER = "groq"
 GROQ_API_KEY = "your_real_groq_key_here"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
 ```
 
 Save the secrets and restart the app if it does not restart automatically. The API key is read from Streamlit Secrets at runtime; it should never be committed to GitHub.
