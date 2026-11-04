@@ -21,7 +21,7 @@ load_dotenv()
 # Load Streamlit Community Cloud secrets when the app is deployed.
 # Local runs can continue using the .env file.
 try:
-    for key in ("USE_OPENAI", "OPENAI_API_KEY", "OPENAI_MODEL"):
+    for key in ("AI_PROVIDER", "USE_OPENAI", "OPENAI_API_KEY", "OPENAI_MODEL", "GROQ_API_KEY", "GROQ_MODEL"):
         if key in st.secrets:
             os.environ[key] = str(st.secrets[key])
 except Exception:
@@ -40,28 +40,46 @@ init_db()
 
 
 def render_sidebar() -> str:
-    has_key = bool(os.getenv("OPENAI_API_KEY", "").strip())
-    configured_for_ai = os.getenv("USE_OPENAI", "false").strip().lower() == "true"
-    default_mode = "AI Mode" if configured_for_ai and has_key else "Demo Mode"
+    openai_key = bool(os.getenv("OPENAI_API_KEY", "").strip())
+    groq_key = bool(os.getenv("GROQ_API_KEY", "").strip())
+    configured_provider = os.getenv("AI_PROVIDER", "").strip().lower()
+
+    # Keep compatibility with the earlier OpenAI configuration.
+    if not configured_provider and os.getenv("USE_OPENAI", "false").strip().lower() == "true":
+        configured_provider = "openai"
+
+    if configured_provider == "groq" and groq_key:
+        default_mode = "Groq Mode"
+    elif configured_provider == "openai" and openai_key:
+        default_mode = "OpenAI Mode"
+    else:
+        default_mode = "Demo Mode"
+
+    modes = ["Demo Mode", "OpenAI Mode", "Groq Mode"]
 
     with st.sidebar:
         st.markdown('<div class="sidebar-logo">🤖 TaskBot AI</div>', unsafe_allow_html=True)
         selected_mode = st.selectbox(
             "Choose chatbot mode",
-            ["Demo Mode", "AI Mode"],
-            index=0 if default_mode == "Demo Mode" else 1,
+            modes,
+            index=modes.index(default_mode),
             key="agent_mode",
         )
 
-        if selected_mode == "AI Mode":
+        if selected_mode == "Groq Mode":
+            model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+            mode_text = f"Groq · {model}"
+            if groq_key:
+                st.success(f"Groq Mode is ready · {model}")
+            else:
+                st.warning("Add GROQ_API_KEY to your .env file or Streamlit Cloud Secrets.")
+        elif selected_mode == "OpenAI Mode":
             model = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
             mode_text = f"OpenAI · {model}"
-            if has_key:
-                st.success(f"AI Mode is ready · {model}")
+            if openai_key:
+                st.success(f"OpenAI Mode is ready · {model}")
             else:
-                st.warning(
-                    "Add OPENAI_API_KEY to your .env file, then restart the app."
-                )
+                st.warning("Add OPENAI_API_KEY to your .env file or Streamlit Cloud Secrets.")
         else:
             mode_text = "Free local demo mode"
             st.caption("Demo Mode runs locally and does not use an API key.")
@@ -100,7 +118,6 @@ def render_sidebar() -> str:
             st.rerun()
 
     return selected_mode
-
 
 def render_hero() -> None:
     st.markdown(
@@ -328,6 +345,6 @@ with about_tab:
         5. The chatbot explains the result and displays its activity steps.
 
         **Demo mode** uses a local intent detector and costs nothing.
-        **OpenAI mode** uses model function calling for better language understanding.
+        **OpenAI Mode** and **Groq Mode** use model function calling for better language understanding.
         """
     )
