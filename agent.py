@@ -243,6 +243,99 @@ Keep the final answer brief and use readable Markdown.
     )
 
 
+
+def _groq_agent(message: str) -> AgentResult:
+    """Use Groq Chat Completions with function calling for task actions."""
+    from groq import Groq
+
+    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    today = datetime.now().strftime("%A, %d %B %Y")
+
+    instructions = f"""
+You are TaskBot AI, a concise and friendly task-management agent.
+Today is {today}.
+
+You can add, list, complete, and delete tasks by calling tools.
+Always use a tool when the user requests a task-management action.
+For an add request:
+- create a short title,
+- use "No deadline" when no deadline is provided,
+- use Medium priority when no priority is provided.
+Never claim an action succeeded unless the tool result says it succeeded.
+Keep the final answer brief and use readable Markdown.
+"""
+
+    # Groq uses the Chat Completions function-tool format.
+    groq_tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool["description"],
+                "parameters": tool["parameters"],
+            },
+        }
+        for tool in TOOLS
+    ]
+
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": instructions},
+        {"role": "user", "content": message},
+    ]
+    activity = ["Understood your request", "Selected the appropriate tool"]
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        tools=groq_tools,
+        tool_choice="auto",
+        parallel_tool_calls=False,
+    )
+    assistant_message = response.choices[0].message
+    tool_calls = assistant_message.tool_calls or []
+
+    if tool_calls:
+        messages.append(assistant_message.model_dump(exclude_none=True))
+
+        for tool_call in tool_calls:
+            tool_name = tool_call.function.name
+            arguments = json.loads(tool_call.function.arguments or "{}")
+
+            try:
+                tool_output, step = _execute_tool(tool_name, arguments)
+                activity.append(step)
+            except Exception as error:
+                tool_output = json.dumps(
+                    {"success": False, "error": str(error)},
+                    ensure_ascii=False,
+                )
+                activity.append(f"Tool reported: {error}")
+
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": tool_output,
+                }
+            )
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=groq_tools,
+            tool_choice="auto",
+            parallel_tool_calls=False,
+        )
+        activity.append("Prepared the final response")
+
+    reply = response.choices[0].message.content or "I processed your request."
+    return AgentResult(
+        reply=reply.strip(),
+        activity=activity,
+        mode=f"Groq · {model}",
+    )
+
 def _extract_deadline(message: str) -> tuple[str, str]:
     """
     Find a date phrase and return:
@@ -468,15 +561,40 @@ def _demo_agent(message: str, fallback_reason: str | None = None) -> AgentResult
 
 def process_message(message: str, mode: str = "Demo Mode") -> AgentResult:
     """Run the mode explicitly selected in the Streamlit sidebar."""
-    if mode == "AI Mode":
+    if mode == "Groq Mode":
+        if not os.getenv("GROQ_API_KEY", "").strip():
+            return AgentResult(
+                reply=(
+                    "⚠️ **Groq API key is missing.** Add GROQ_API_KEY to your "
+                    "`.env` file or Streamlit Cloud Secrets, then restart the app."
+                ),
+                activity=["Groq Mode selected", "API key not found"],
+                mode="Groq · Not configured",
+            )
+
+        try:
+            return _groq_agent(message)
+        except Exception as error:
+            return AgentResult(
+                reply=(
+                    "⚠️ **Could not connect to Groq.** Your request was not "
+                    "run in Demo Mode. Check that your Groq API key is valid, "
+                    "your account has available API quota, and GROQ_MODEL is "
+                    "a currently supported model.\n\n"
+                    f"**Error details:** {error}"
+                ),
+                activity=["Groq Mode selected", "Groq request failed"],
+                mode="Groq · Error",
+            )
+
+    if mode in ("OpenAI Mode", "AI Mode"):
         if not os.getenv("OPENAI_API_KEY", "").strip():
             return AgentResult(
                 reply=(
-                    "⚠️ **OpenAI API key is missing.** Add your key to the "
-                    "`.env` file as `OPENAI_API_KEY=your_key_here`, then "
-                    "restart the app and select AI Mode again."
+                    "⚠️ **OpenAI API key is missing.** Add OPENAI_API_KEY to "
+                    "your `.env` file or Streamlit Cloud Secrets, then restart the app."
                 ),
-                activity=["AI Mode selected", "API key not found"],
+                activity=["OpenAI Mode selected", "API key not found"],
                 mode="OpenAI · Not configured",
             )
 
@@ -488,10 +606,10 @@ def process_message(message: str, mode: str = "Demo Mode") -> AgentResult:
                     "⚠️ **Could not connect to OpenAI.** Your request was not "
                     "run in Demo Mode. Check that your API key is valid, your "
                     "account has API billing/credits available, and the model "
-                    "name in `.env` is supported.\n\n"
+                    "name is supported.\n\n"
                     f"**Error details:** {error}"
                 ),
-                activity=["AI Mode selected", "OpenAI request failed"],
+                activity=["OpenAI Mode selected", "OpenAI request failed"],
                 mode="OpenAI · Error",
             )
 
