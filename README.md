@@ -21,6 +21,7 @@ The chatbot follows an action loop:
 - SQLite database
 - Agent activity panel
 - Free local demo mode
+- Optional Groq function-calling mode
 - Optional OpenAI function-calling mode
 
 ## Commands to try
@@ -73,24 +74,50 @@ cp .env.example .env
 streamlit run app.py
 ```
 
-## Configure OpenAI AI Mode
+## Configure Groq Mode (recommended)
 
-1. Create an API key from [OpenAI API keys](https://platform.openai.com/api-keys).
+1. Create a Groq API key from [Groq Console](https://console.groq.com/keys).
 2. Open the `.env` file in the project root.
 3. Add your key and model configuration:
 
 ```env
-USE_OPENAI=true
+AI_PROVIDER=groq
+GROQ_API_KEY=your_real_groq_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+4. Install the dependencies with `pip install -r requirements.txt`.
+5. Restart Streamlit and select **Groq Mode** in the sidebar.
+
+## Configure Groq on Streamlit Community Cloud
+
+Open your app's **Manage app → Settings → Secrets** and add:
+
+```toml
+AI_PROVIDER = "groq"
+GROQ_API_KEY = "your_real_groq_key_here"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+```
+
+Save the secrets and restart the app if it does not restart automatically. The API key is read from Streamlit Secrets at runtime; it should never be committed to GitHub.
+
+## Configure OpenAI Mode (optional)
+
+1. Create an API key from [OpenAI API keys](https://platform.openai.com/api-keys).
+2. Add the following to your `.env` file:
+
+```env
+AI_PROVIDER=openai
 OPENAI_API_KEY=your_real_key_here
 OPENAI_MODEL=gpt-5.4-mini
 ```
 
-4. Save the file and restart Streamlit.
-5. In the sidebar, select **AI Mode**. Select **Demo Mode** whenever you want to use the free local intent detector.
+3. Restart Streamlit and select **OpenAI Mode** in the sidebar.
 
-The app remembers the selected mode while the Streamlit session is active. If AI Mode is selected without a key, the app shows a setup warning. If an OpenAI request fails, it displays the error instead of silently running the request in Demo Mode.
+You can select **Demo Mode** whenever you want to use the free local intent detector. The app displays an error if a selected provider is not configured or its request fails; it does not silently switch to Demo Mode.
 
-Never upload `.env` to GitHub or share your API key. API usage may incur separate charges; a ChatGPT subscription does not include API usage.
+Never upload `.env` to GitHub or share your API key. API usage and quotas depend on the provider and account.
+
 
 ## Project files
 
