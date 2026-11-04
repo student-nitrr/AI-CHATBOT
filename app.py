@@ -29,17 +29,33 @@ inject_css(st)
 init_db()
 
 
-def render_sidebar() -> None:
-    use_openai = os.getenv("USE_OPENAI", "false").lower() == "true"
+def render_sidebar() -> str:
     has_key = bool(os.getenv("OPENAI_API_KEY", "").strip())
-
-    if use_openai and has_key:
-        mode_text = f'OpenAI · {os.getenv("OPENAI_MODEL", "gpt-5.4-mini")}'
-    else:
-        mode_text = "Free local demo mode"
+    configured_for_ai = os.getenv("USE_OPENAI", "false").strip().lower() == "true"
+    default_mode = "AI Mode" if configured_for_ai and has_key else "Demo Mode"
 
     with st.sidebar:
         st.markdown('<div class="sidebar-logo">🤖 TaskBot AI</div>', unsafe_allow_html=True)
+        selected_mode = st.selectbox(
+            "Choose chatbot mode",
+            ["Demo Mode", "AI Mode"],
+            index=0 if default_mode == "Demo Mode" else 1,
+            key="agent_mode",
+        )
+
+        if selected_mode == "AI Mode":
+            model = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
+            mode_text = f"OpenAI · {model}"
+            if has_key:
+                st.success(f"AI Mode is ready · {model}")
+            else:
+                st.warning(
+                    "Add OPENAI_API_KEY to your .env file, then restart the app."
+                )
+        else:
+            mode_text = "Free local demo mode"
+            st.caption("Demo Mode runs locally and does not use an API key.")
+
         st.markdown(f'<span class="mode-chip">{html.escape(mode_text)}</span>', unsafe_allow_html=True)
 
         st.markdown("### Try these commands")
@@ -72,6 +88,8 @@ def render_sidebar() -> None:
                 }
             ]
             st.rerun()
+
+    return selected_mode
 
 
 def render_hero() -> None:
@@ -141,7 +159,10 @@ def save_and_render_user_message(message: str) -> None:
 def process_and_save_assistant_message(message: str) -> None:
     with st.chat_message("assistant"):
         with st.spinner("TaskBot is selecting a tool..."):
-            result: AgentResult = process_message(message)
+            result: AgentResult = process_message(
+                message,
+                st.session_state.get("agent_mode", "Demo Mode"),
+            )
         st.markdown(result.reply)
         render_activity(result.activity, result.mode)
 
