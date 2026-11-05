@@ -82,7 +82,7 @@ def render_sidebar() -> str:
             else:
                 st.warning("Add GROQ_API_KEY to your .env file or Streamlit Cloud Secrets.")
         elif selected_mode == "Gemini Mode":
-            model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+            model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
             mode_text = f"Gemini · {model}"
             if gemini_key:
                 st.success(f"Gemini Mode is ready · {model}")
