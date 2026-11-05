@@ -7,6 +7,26 @@ APP_CSS = """
     [data-testid="stSidebar"] * { color: #e5eaf3; }
     [data-testid="stSidebar"] [data-testid="stRadio"] label { padding: .48rem .65rem; border-radius: 10px; }
     [data-testid="stSidebar"] [data-testid="stRadio"] label:hover { background: #263244; }
+
+    /* Keep text readable inside the light provider selectbox on the dark sidebar. */
+    [data-testid="stSidebar"] [data-baseweb="select"] > div {
+        background: #ffffff !important;
+        border-color: #d7deea !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="select"] input,
+    [data-testid="stSidebar"] [data-baseweb="select"] [role="combobox"],
+    [data-testid="stSidebar"] [data-baseweb="select"] [aria-selected="true"],
+    [data-testid="stSidebar"] [data-baseweb="select"] div[class*="singleValue"] {
+        color: #172033 !important;
+        -webkit-text-fill-color: #172033 !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="popover"],
+    [data-testid="stSidebar"] [data-baseweb="popover"] * {
+        color: #172033 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stAlert"] p {
+        color: inherit !important;
+    }
     .block-container { max-width: 1220px; padding-top: 2.1rem; padding-bottom: 3rem; }
     .brand-lockup { display:flex; align-items:center; gap:.75rem; padding:.6rem 0 1rem; }
     .brand-mark { width:42px; height:42px; display:grid; place-items:center; border-radius:14px; background:linear-gradient(135deg,#8b5cf6,#38bdf8); color:white; font-size:1.5rem; font-weight:800; }
