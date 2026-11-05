@@ -162,6 +162,10 @@ def _execute_tool(name: str, arguments: dict[str, Any]) -> tuple[str, str]:
     return json.dumps(result, ensure_ascii=False), activity
 
 
+class ProviderUnavailableError(Exception):
+    """Raised only when a provider's first API request fails, before task actions run."""
+
+
 def _openai_agent(message: str) -> AgentResult:
     """Use OpenAI Responses API function calling when an API key is configured."""
     from openai import OpenAI
@@ -185,13 +189,16 @@ Keep the final answer brief and use readable Markdown.
 """
 
     running_input: list[Any] = [{"role": "user", "content": message}]
-    response = client.responses.create(
-        model=model,
-        instructions=instructions,
-        tools=TOOLS,
-        input=running_input,
-        parallel_tool_calls=False,
-    )
+    try:
+        response = client.responses.create(
+            model=model,
+            instructions=instructions,
+            tools=TOOLS,
+            input=running_input,
+            parallel_tool_calls=False,
+        )
+    except Exception as error:
+        raise ProviderUnavailableError(str(error)) from error
 
     running_input += response.output
     activity = ["Understood your request", "Selected the appropriate tool"]
@@ -285,13 +292,17 @@ Keep the final answer brief and use readable Markdown.
     ]
     activity = ["Understood your request", "Selected the appropriate tool"]
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        tools=groq_tools,
-        tool_choice="auto",
-        parallel_tool_calls=False,
-    )
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=groq_tools,
+            tool_choice="auto",
+            parallel_tool_calls=False,
+        )
+    except Exception as error:
+        raise ProviderUnavailableError(str(error)) from error
+
     assistant_message = response.choices[0].message
     tool_calls = assistant_message.tool_calls or []
 
@@ -560,7 +571,54 @@ def _demo_agent(message: str, fallback_reason: str | None = None) -> AgentResult
 
 
 def process_message(message: str, mode: str = "Demo Mode") -> AgentResult:
-    """Run the mode explicitly selected in the Streamlit sidebar."""
+    """Run the selected provider, or use Groq with OpenAI as an automatic backup."""
+    if mode == "Auto Mode":
+        groq_key = os.getenv("GROQ_API_KEY", "").strip()
+        openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+        fallback_note = ""
+
+        if groq_key:
+            try:
+                result = _groq_agent(message)
+                result.activity.insert(0, "Auto Mode selected · Groq handled the request")
+                result.mode = f"Auto · {result.mode}"
+                return result
+            except ProviderUnavailableError as error:
+                fallback_note = f"Groq's initial request failed; trying OpenAI ({error})"
+            except Exception as error:
+                return AgentResult(
+                    reply=f"⚠️ Groq failed after the request started. No automatic retry was made to avoid repeating a task action. Error: {error}",
+                    activity=["Auto Mode selected", "Groq request failed"],
+                    mode="Auto · Groq error",
+                )
+
+        if openai_key:
+            try:
+                result = _openai_agent(message)
+                result.activity.insert(0, "Auto Mode selected · OpenAI backup handled the request")
+                if fallback_note:
+                    result.activity.insert(1, "Groq was unavailable; switched to OpenAI")
+                result.mode = f"Auto · {result.mode}"
+                return result
+            except ProviderUnavailableError as error:
+                return AgentResult(
+                    reply=f"⚠️ Both configured providers are unavailable. Groq: {fallback_note or 'not configured'}. OpenAI: {error}",
+                    activity=["Auto Mode selected", "Groq/OpenAI initial request failed"],
+                    mode="Auto · Error",
+                )
+            except Exception as error:
+                return AgentResult(
+                    reply=f"⚠️ OpenAI failed after the request started. No further retry was made to avoid repeating a task action. Error: {error}",
+                    activity=["Auto Mode selected", "OpenAI backup failed"],
+                    mode="Auto · OpenAI error",
+                )
+
+        return AgentResult(
+            reply="⚠️ Auto Mode needs at least one configured key. Add GROQ_API_KEY and/or OPENAI_API_KEY to your .env file or Streamlit Cloud Secrets.",
+            activity=["Auto Mode selected", "No API keys found"],
+            mode="Auto · Not configured",
+        )
+
     if mode == "Groq Mode":
         if not os.getenv("GROQ_API_KEY", "").strip():
             return AgentResult(
