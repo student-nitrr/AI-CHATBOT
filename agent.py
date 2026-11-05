@@ -347,6 +347,71 @@ Keep the final answer brief and use readable Markdown.
         mode=f"Groq · {model}",
     )
 
+
+
+def _gemini_agent(message: str) -> AgentResult:
+    """Use Gemini through Google's OpenAI-compatible Chat Completions endpoint."""
+    from openai import OpenAI
+
+    client = OpenAI(
+        api_key=os.environ["GEMINI_API_KEY"],
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    )
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    today = datetime.now().strftime("%A, %d %B %Y")
+    instructions = f"""You are TaskBot AI, a concise task-management agent.
+Today is {today}. You can add, list, complete, and delete tasks using tools.
+Always use a tool for task actions. For adds, use No deadline if absent and Medium priority if absent.
+Never claim an action succeeded unless the tool result confirms it. Keep replies brief."""
+
+    gemini_tools = [
+        {"type": "function", "function": {
+            "name": tool["name"],
+            "description": tool["description"],
+            "parameters": tool["parameters"],
+        }}
+        for tool in TOOLS
+    ]
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": instructions},
+        {"role": "user", "content": message},
+    ]
+    activity = ["Understood your request", "Selected the appropriate tool"]
+    try:
+        response = client.chat.completions.create(
+            model=model, messages=messages, tools=gemini_tools, tool_choice="auto"
+        )
+    except Exception as error:
+        raise ProviderUnavailableError(str(error)) from error
+
+    assistant_message = response.choices[0].message
+    tool_calls = assistant_message.tool_calls or []
+    if tool_calls:
+        messages.append(assistant_message.model_dump(exclude_none=True))
+        for tool_call in tool_calls:
+            try:
+                output, step = _execute_tool(
+                    tool_call.function.name,
+                    json.loads(tool_call.function.arguments or "{}"),
+                )
+                activity.append(step)
+            except Exception as error:
+                output = json.dumps({"success": False, "error": str(error)}, ensure_ascii=False)
+                activity.append(f"Tool reported: {error}")
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": output,
+            })
+        response = client.chat.completions.create(
+            model=model, messages=messages, tools=gemini_tools, tool_choice="auto"
+        )
+        activity.append("Prepared the final response")
+
+    reply = response.choices[0].message.content or "I processed your request."
+    return AgentResult(reply=reply.strip(), activity=activity, mode=f"Gemini · {model}")
+
+
 def _extract_deadline(message: str) -> tuple[str, str]:
     """
     Find a date phrase and return:
@@ -571,101 +636,84 @@ def _demo_agent(message: str, fallback_reason: str | None = None) -> AgentResult
 
 
 def process_message(message: str, mode: str = "Demo Mode") -> AgentResult:
-    """Run the selected provider, or use Groq with OpenAI as an automatic backup."""
-    if mode == "Auto Mode":
-        groq_key = os.getenv("GROQ_API_KEY", "").strip()
-        openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-        fallback_note = ""
+    """Use Groq first and Gemini as the backup provider."""
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
 
+    if mode == "Auto Mode":
+        groq_error = ""
         if groq_key:
             try:
                 result = _groq_agent(message)
-                result.activity.insert(0, "Auto Mode selected · Groq handled the request")
+                result.activity.insert(0, "Auto Mode · Groq handled the request")
                 result.mode = f"Auto · {result.mode}"
                 return result
             except ProviderUnavailableError as error:
-                fallback_note = f"Groq's initial request failed; trying OpenAI ({error})"
+                groq_error = str(error)
             except Exception as error:
                 return AgentResult(
-                    reply=f"⚠️ Groq failed after the request started. No automatic retry was made to avoid repeating a task action. Error: {error}",
-                    activity=["Auto Mode selected", "Groq request failed"],
+                    reply=f"⚠️ Groq failed after processing started. No retry was made to avoid repeating a task action. Error: {error}",
+                    activity=["Auto Mode selected", "Groq failed after initial response"],
                     mode="Auto · Groq error",
                 )
-
-        if openai_key:
+        if gemini_key:
             try:
-                result = _openai_agent(message)
-                result.activity.insert(0, "Auto Mode selected · OpenAI backup handled the request")
-                if fallback_note:
-                    result.activity.insert(1, "Groq was unavailable; switched to OpenAI")
+                result = _gemini_agent(message)
+                result.activity.insert(0, "Auto Mode · Gemini handled the request")
+                if groq_error:
+                    result.activity.insert(1, "Groq was unavailable; switched to Gemini")
                 result.mode = f"Auto · {result.mode}"
                 return result
             except ProviderUnavailableError as error:
                 return AgentResult(
-                    reply=f"⚠️ Both configured providers are unavailable. Groq: {fallback_note or 'not configured'}. OpenAI: {error}",
-                    activity=["Auto Mode selected", "Groq/OpenAI initial request failed"],
+                    reply=f"⚠️ Groq and Gemini are unavailable. Groq: {groq_error or 'not configured'}. Gemini: {error}",
+                    activity=["Auto Mode selected", "Both provider requests failed"],
                     mode="Auto · Error",
                 )
             except Exception as error:
                 return AgentResult(
-                    reply=f"⚠️ OpenAI failed after the request started. No further retry was made to avoid repeating a task action. Error: {error}",
-                    activity=["Auto Mode selected", "OpenAI backup failed"],
-                    mode="Auto · OpenAI error",
+                    reply=f"⚠️ Gemini failed after processing started. No retry was made to avoid repeating a task action. Error: {error}",
+                    activity=["Auto Mode selected", "Gemini failed after initial response"],
+                    mode="Auto · Gemini error",
                 )
-
         return AgentResult(
-            reply="⚠️ Auto Mode needs at least one configured key. Add GROQ_API_KEY and/or OPENAI_API_KEY to your .env file or Streamlit Cloud Secrets.",
+            reply="⚠️ Add GROQ_API_KEY and/or GEMINI_API_KEY to Streamlit Secrets to use Auto Mode.",
             activity=["Auto Mode selected", "No API keys found"],
             mode="Auto · Not configured",
         )
 
     if mode == "Groq Mode":
-        if not os.getenv("GROQ_API_KEY", "").strip():
+        if not groq_key:
             return AgentResult(
-                reply=(
-                    "⚠️ **Groq API key is missing.** Add GROQ_API_KEY to your "
-                    "`.env` file or Streamlit Cloud Secrets, then restart the app."
-                ),
+                reply="⚠️ Add GROQ_API_KEY to Streamlit Secrets or your .env file.",
                 activity=["Groq Mode selected", "API key not found"],
                 mode="Groq · Not configured",
             )
-
         try:
             return _groq_agent(message)
         except ProviderUnavailableError as error:
-            # The first model request failed before any task tool could run.
-            # Safely try OpenAI as a backup when Groq is unavailable.
-            if os.getenv("OPENAI_API_KEY", "").strip():
+            if gemini_key:
                 try:
-                    result = _openai_agent(message)
-                    result.activity.insert(0, "Groq was unavailable; OpenAI handled the request")
+                    result = _gemini_agent(message)
+                    result.activity.insert(0, "Groq was unavailable; Gemini handled the request")
                     result.mode = f"Fallback · {result.mode}"
                     return result
                 except Exception as backup_error:
                     return AgentResult(
-                        reply=f"⚠️ Groq and OpenAI are both unavailable. Groq: {error}. OpenAI: {backup_error}",
-                        activity=["Groq request failed", "OpenAI backup failed"],
+                        reply=f"⚠️ Groq and Gemini are unavailable. Groq: {error}. Gemini: {backup_error}",
+                        activity=["Groq failed", "Gemini backup failed"],
                         mode="Both providers · Error",
                     )
             return AgentResult(
-                reply=(
-                    "⚠️ **Could not connect to Groq.** Check your API key, "
-                    "quota, and model. Add OPENAI_API_KEY to enable OpenAI backup.\n\n"
-                    f"**Error details:** {error}"
-                ),
-                activity=["Groq Mode selected", "Groq request failed", "No OpenAI backup key configured"],
+                reply=f"⚠️ Groq failed and no Gemini backup key is configured. Error: {error}",
+                activity=["Groq Mode selected", "No Gemini backup key"],
                 mode="Groq · Error",
             )
         except Exception as error:
             return AgentResult(
-                reply=(
-                    "⚠️ **Groq failed after processing started.** No provider "
-                    "retry was made because a task action may already have run.\n\n"
-                    f"**Error details:** {error}"
-                ),
-                activity=["Groq Mode selected", "Groq request failed after initial response"],
+                reply=f"⚠️ Groq failed after processing started. No retry was made to avoid duplicate task actions. Error: {error}",
+                activity=["Groq failed after initial response"],
                 mode="Groq · Error",
             )
-
 
     return _demo_agent(message)
