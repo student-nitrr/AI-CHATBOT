@@ -52,12 +52,10 @@ def render_sidebar() -> str:
         default_mode = "Auto Mode"
     elif configured_provider == "groq" and groq_key:
         default_mode = "Groq Mode"
-    elif configured_provider == "openai" and openai_key:
-        default_mode = "OpenAI Mode"
     else:
         default_mode = "Demo Mode"
 
-    modes = ["Demo Mode", "Auto Mode", "OpenAI Mode", "Groq Mode"]
+    modes = ["Demo Mode", "Auto Mode", "Groq Mode"]
 
     with st.sidebar:
         st.markdown('<div class="sidebar-logo">🤖 TaskBot AI</div>', unsafe_allow_html=True)
@@ -71,7 +69,7 @@ def render_sidebar() -> str:
         if selected_mode == "Auto Mode":
             groq_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
             openai_model = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
-            mode_text = "Auto · Groq → OpenAI"
+            mode_text = "Auto · Groq with OpenAI backup"
             if groq_key and openai_key:
                 st.success("Auto Mode is ready · Groq primary, OpenAI backup")
             elif groq_key or openai_key:
@@ -85,13 +83,6 @@ def render_sidebar() -> str:
                 st.success(f"Groq Mode is ready · {model}")
             else:
                 st.warning("Add GROQ_API_KEY to your .env file or Streamlit Cloud Secrets.")
-        elif selected_mode == "OpenAI Mode":
-            model = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
-            mode_text = f"OpenAI · {model}"
-            if openai_key:
-                st.success(f"OpenAI Mode is ready · {model}")
-            else:
-                st.warning("Add OPENAI_API_KEY to your .env file or Streamlit Cloud Secrets.")
         else:
             mode_text = "Free local demo mode"
             st.caption("Demo Mode runs locally and does not use an API key.")
