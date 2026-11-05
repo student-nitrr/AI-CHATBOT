@@ -357,7 +357,7 @@ def _gemini_agent(message: str) -> AgentResult:
         api_key=os.environ["GEMINI_API_KEY"],
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
     )
-    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
     today = datetime.now().strftime("%A, %d %B %Y")
     instructions = f"""You are TaskBot AI, a concise task-management agent.
 Today is {today}. You can add, list, complete, and delete tasks using tools.
