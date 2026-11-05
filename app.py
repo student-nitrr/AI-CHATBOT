@@ -135,8 +135,12 @@ def render_sidebar() -> str:
 
 
 def render_header(eyebrow: str, title: str, subtitle: str) -> None:
+    eyebrow_html = (
+        f'<div class="eyebrow">{html.escape(eyebrow)}</div>'
+        if eyebrow else ""
+    )
     st.markdown(
-        f'<div class="page-heading"><div class="eyebrow">{html.escape(eyebrow)}</div>'
+        f'<div class="page-heading">{eyebrow_html}'
         f'<h1>{html.escape(title)}</h1><p>{html.escape(subtitle)}</p></div>',
         unsafe_allow_html=True,
     )
@@ -285,7 +289,7 @@ def render_tasks_page() -> None:
 
 
 def render_overview_page() -> None:
-    render_header("YOUR PRODUCTIVITY, AT A GLANCE", "Good to see you 👋", "Plan your work, stay focused, and let TaskBot handle the task updates.")
+    render_header("", "Good to see you 👋", "Plan your work, stay focused, and let TaskBot handle the task updates.")
     render_stats()
     st.markdown('<div class="section-heading">A little help to get started</div>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
