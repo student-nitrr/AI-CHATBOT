@@ -84,7 +84,7 @@ streamlit run app.py
 ```env
 AI_PROVIDER=groq
 GROQ_API_KEY=your_real_groq_key_here
-GROQ_MODEL=gemini/gpt-oss-120b
+GROQ_MODEL=openai/gpt-oss-120b
 ```
 
 4. Install the dependencies with `pip install -r requirements.txt`.
