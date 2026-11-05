@@ -13,12 +13,21 @@ APP_CSS = """
         background: #ffffff !important;
         border-color: #d7deea !important;
     }
+    /* Force the selected provider label (e.g. Auto Mode) to use dark,
+       fully opaque text. Streamlit/BaseWeb can apply its own muted value colour. */
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] *,
     [data-testid="stSidebar"] [data-baseweb="select"] input,
     [data-testid="stSidebar"] [data-baseweb="select"] [role="combobox"],
     [data-testid="stSidebar"] [data-baseweb="select"] [aria-selected="true"],
     [data-testid="stSidebar"] [data-baseweb="select"] div[class*="singleValue"] {
         color: #172033 !important;
         -webkit-text-fill-color: #172033 !important;
+        opacity: 1 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] div[class*="singleValue"] {
+        color: #172033 !important;
+        -webkit-text-fill-color: #172033 !important;
+        opacity: 1 !important;
     }
     [data-testid="stSidebar"] [data-baseweb="popover"],
     [data-testid="stSidebar"] [data-baseweb="popover"] * {
