@@ -23,6 +23,7 @@ The chatbot follows an action loop:
 - Free local demo mode
 - Optional Groq function-calling mode
 - Optional OpenAI function-calling mode
+- Auto Mode: tries Groq first and OpenAI as a backup
 
 ## Commands to try
 
@@ -94,12 +95,14 @@ GROQ_MODEL=openai/gpt-oss-120b
 Open your app's **Manage app → Settings → Secrets** and add:
 
 ```toml
-AI_PROVIDER = "groq"
+AI_PROVIDER = "auto"
 GROQ_API_KEY = "your_real_groq_key_here"
 GROQ_MODEL = "openai/gpt-oss-120b"
+OPENAI_API_KEY = "your_real_openai_key_here"
+OPENAI_MODEL = "gpt-5.4-mini"
 ```
 
-Save the secrets and restart the app if it does not restart automatically. The API key is read from Streamlit Secrets at runtime; it should never be committed to GitHub.
+Save the secrets and restart the app if it does not restart automatically. Select **Auto Mode** in the sidebar to use Groq first and OpenAI as backup. The API keys are read from Streamlit Secrets at runtime; they should never be committed to GitHub.
 
 ## Configure OpenAI Mode (optional)
 
