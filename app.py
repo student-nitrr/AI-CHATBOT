@@ -113,9 +113,15 @@ def render_sidebar() -> str:
             else:
                 st.warning("Add a Groq or Gemini key in Secrets.")
         elif selected_mode == "Groq Mode":
-            st.success("Groq key configured") if groq_key else st.warning("GROQ_API_KEY not found")
+            if groq_key:
+                st.success("Groq key configured")
+            else:
+                st.warning("GROQ_API_KEY not found")
         elif selected_mode == "Gemini Mode":
-            st.success("Gemini key configured") if gemini_key else st.warning("GEMINI_API_KEY not found")
+            if gemini_key:
+                st.success("Gemini key configured")
+            else:
+                st.warning("GEMINI_API_KEY not found")
         else:
             st.caption("Local demo · No API usage")
 
