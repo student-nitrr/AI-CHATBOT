@@ -18,231 +18,189 @@ from styles import inject_css
 
 load_dotenv()
 
-# Load Streamlit Community Cloud secrets when the app is deployed.
-# Local runs can continue using the .env file.
+# Load provider settings from Streamlit Cloud Secrets or local environment.
 try:
-    for key in ("AI_PROVIDER", "GROQ_API_KEY", "GROQ_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL"):
+    for key in (
+        "AI_PROVIDER", "GROQ_API_KEY", "GROQ_MODEL",
+        "GEMINI_API_KEY", "GEMINI_MODEL",
+    ):
         if key in st.secrets:
             os.environ[key] = str(st.secrets[key])
 except Exception:
-    # Streamlit secrets may not be configured during local development.
     pass
 
 st.set_page_config(
-    page_title="TaskBot AI",
+    page_title="TaskBot AI · Workspace",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
 inject_css(st)
 init_db()
+
+WELCOME = (
+    "Hey! I'm **TaskBot AI** 👋\\n\\n"
+    "I can add tasks, check your pending work, complete tasks, and keep your day organised. "
+    "What would you like to do?"
+)
+
+
+def initialize_state() -> None:
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{
+            "role": "assistant",
+            "content": WELCOME,
+            "activity": ["Workspace ready", "Connected to SQLite task database"],
+            "mode": "TaskBot",
+        }]
+    if "agent_mode" not in st.session_state:
+        st.session_state.agent_mode = "Auto Mode"
 
 
 def render_sidebar() -> str:
     groq_key = bool(os.getenv("GROQ_API_KEY", "").strip())
-    configured_provider = os.getenv("AI_PROVIDER", "").strip().lower()
-
-    # Keep compatibility with the earlier OpenAI configuration.
     gemini_key = bool(os.getenv("GEMINI_API_KEY", "").strip())
-    if configured_provider == "auto" and (groq_key or gemini_key):
-        default_mode = "Auto Mode"
-    elif configured_provider == "groq" and groq_key:
+    configured = os.getenv("AI_PROVIDER", "auto").strip().lower()
+
+    if configured == "groq" and groq_key:
         default_mode = "Groq Mode"
-    elif configured_provider == "gemini" and gemini_key:
+    elif configured == "gemini" and gemini_key:
         default_mode = "Gemini Mode"
+    elif configured == "auto" and (groq_key or gemini_key):
+        default_mode = "Auto Mode"
     else:
         default_mode = "Demo Mode"
 
-    modes = ["Demo Mode", "Auto Mode", "Groq Mode", "Gemini Mode"]
-
+    modes = ["Auto Mode", "Groq Mode", "Gemini Mode", "Demo Mode"]
     with st.sidebar:
-        st.markdown('<div class="sidebar-logo">🤖 TaskBot AI</div>', unsafe_allow_html=True)
+        st.markdown('<div class="brand-lockup"><div class="brand-mark">✦</div><div><div class="brand-name">TaskBot AI</div><div class="brand-caption">PERSONAL WORKSPACE</div></div></div>', unsafe_allow_html=True)
+        st.markdown("---")
+        st.markdown('<div class="side-label">WORKSPACE</div>', unsafe_allow_html=True)
+        page = st.radio(
+            "Navigation",
+            ["Overview", "AI Assistant", "My Tasks", "About"],
+            label_visibility="collapsed",
+            key="active_page",
+        )
+        st.markdown("---")
+        st.markdown('<div class="side-label">AI PROVIDER</div>', unsafe_allow_html=True)
         selected_mode = st.selectbox(
-            "Choose chatbot mode",
+            "Choose provider",
             modes,
-            index=modes.index(default_mode),
+            index=modes.index(st.session_state.get("agent_mode", default_mode))
+            if st.session_state.get("agent_mode", default_mode) in modes
+            else modes.index(default_mode),
             key="agent_mode",
         )
-
         if selected_mode == "Auto Mode":
-            groq_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-            mode_text = "Auto · Groq with Gemini backup"
             if groq_key and gemini_key:
-                st.success("Auto Mode is ready · Groq primary, Gemini backup")
+                st.success("Auto mode · Groq + Gemini ready")
             elif groq_key or gemini_key:
-                st.info("Auto Mode is ready with one configured provider.")
+                st.info("Auto mode · One provider configured")
             else:
-                st.warning("Add GROQ_API_KEY and/or GEMINI_API_KEY to Streamlit Secrets.")
+                st.warning("Add a Groq or Gemini key in Secrets.")
         elif selected_mode == "Groq Mode":
-            model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-            mode_text = f"Groq · {model}"
-            if groq_key:
-                st.success(f"Groq Mode is ready · {model}")
-            else:
-                st.warning("Add GROQ_API_KEY to your .env file or Streamlit Cloud Secrets.")
+            st.success("Groq key configured") if groq_key else st.warning("GROQ_API_KEY not found")
         elif selected_mode == "Gemini Mode":
-            model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-            mode_text = f"Gemini · {model}"
-            if gemini_key:
-                st.success(f"Gemini Mode is ready · {model}")
-            else:
-                st.warning("Add GEMINI_API_KEY to your .env file or Streamlit Cloud Secrets.")
+            st.success("Gemini key configured") if gemini_key else st.warning("GEMINI_API_KEY not found")
         else:
-            mode_text = "Free local demo mode"
-            st.caption("Demo Mode runs locally and does not use an API key.")
+            st.caption("Local demo · No API usage")
 
-        st.markdown(f'<span class="mode-chip">{html.escape(mode_text)}</span>', unsafe_allow_html=True)
-
-        st.markdown("### Try these commands")
-        st.caption("Add project report for tomorrow")
-        st.caption("Show my pending tasks")
-        st.caption("Complete project report")
-        st.caption("Delete project report")
-
-        st.markdown(
-            """
-            <div class="sidebar-note">
-                <strong>Why is this agentic?</strong><br>
-                The chatbot detects an intention, selects a tool,
-                executes a database action, and reports the result.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        if st.button("🧹 Clear chat", use_container_width=True):
-            st.session_state.messages = [
-                {
-                    "role": "assistant",
-                    "content": (
-                        "Hello! I am **TaskBot AI**. I can add, show, "
-                        "complete, and delete tasks."
-                    ),
-                    "activity": [],
-                    "mode": mode_text,
-                }
-            ]
+        st.markdown('<div class="sidebar-tip"><strong>Quick tip</strong><br>Try “Add assignment for Friday” or “Show my pending tasks”.</div>', unsafe_allow_html=True)
+        if st.button("＋  New conversation", use_container_width=True):
+            st.session_state.messages = [{
+                "role": "assistant", "content": WELCOME,
+                "activity": [], "mode": "TaskBot",
+            }]
+            st.session_state.active_page = "AI Assistant"
             st.rerun()
+    return page
 
-    return selected_mode
 
-def render_hero() -> None:
+def render_header(eyebrow: str, title: str, subtitle: str) -> None:
     st.markdown(
-        """
-        <div class="hero">
-            <span class="hero-badge">Final Year Agentic AI Project</span>
-            <h1>Plan less.<br>Finish more.</h1>
-            <p>
-                A simple task-management chatbot that understands commands,
-                chooses a tool, and performs real actions using SQLite.
-            </p>
-        </div>
-        """,
+        f'<div class="page-heading"><div class="eyebrow">{html.escape(eyebrow)}</div>'
+        f'<h1>{html.escape(title)}</h1><p>{html.escape(subtitle)}</p></div>',
         unsafe_allow_html=True,
     )
 
 
 def render_stats() -> None:
     stats = get_stats()
-    columns = st.columns(3)
+    completion = round((stats["completed"] / stats["total"]) * 100) if stats["total"] else 0
     cards = [
-        ("Total tasks", stats["total"]),
-        ("Pending", stats["pending"]),
-        ("Completed", stats["completed"]),
+        ("TOTAL TASKS", stats["total"], "▤", "All your tasks"),
+        ("PENDING", stats["pending"], "◷", "Still to do"),
+        ("COMPLETED", stats["completed"], "✓", "Successfully done"),
     ]
-
-    for column, (label, value) in zip(columns, cards):
-        with column:
+    cols = st.columns(3)
+    for col, (label, value, symbol, hint) in zip(cols, cards):
+        with col:
             st.markdown(
-                f"""
-                <div class="stat-card">
-                    <div class="stat-label">{html.escape(label)}</div>
-                    <div class="stat-value">{value}</div>
-                </div>
-                """,
+                f'<div class="metric-card"><div class="metric-top"><span>{label}</span><span class="metric-icon">{symbol}</span></div>'
+                f'<div class="metric-number">{value}</div><div class="metric-hint">{hint}</div></div>',
                 unsafe_allow_html=True,
             )
+    st.markdown(
+        f'<div class="progress-panel"><div class="progress-copy"><span>Overall progress</span><strong>{completion}%</strong></div>'
+        f'<div class="progress-track"><div class="progress-fill" style="width:{completion}%"></div></div></div>',
+        unsafe_allow_html=True,
+    )
 
 
 def render_activity(activity: list[str], mode: str) -> None:
     if not activity:
         return
-
-    steps = "<br>".join(
-        f"✓ {html.escape(step)}" for step in activity
-    )
+    steps = "".join(f"<li>{html.escape(step)}</li>" for step in activity)
     st.markdown(
-        f"""
-        <div class="activity-card">
-            <strong>Agent activity · {html.escape(mode)}</strong><br>
-            {steps}
-        </div>
-        """,
+        f'<div class="activity-panel"><div class="activity-heading">✦ Agent activity <span>{html.escape(mode)}</span></div><ul>{steps}</ul></div>',
         unsafe_allow_html=True,
     )
 
 
-def save_and_render_user_message(message: str) -> None:
-    st.session_state.messages.append(
-        {"role": "user", "content": message, "activity": [], "mode": ""}
-    )
-    with st.chat_message("user"):
-        st.markdown(message)
-
-
 def process_and_save_assistant_message(message: str) -> None:
-    with st.chat_message("assistant"):
-        with st.spinner("TaskBot is selecting a tool..."):
+    with st.chat_message("assistant", avatar="🤖"):
+        with st.spinner("TaskBot is thinking..."):
             result: AgentResult = process_message(
-                message,
-                st.session_state.get("agent_mode", "Demo Mode"),
+                message, st.session_state.get("agent_mode", "Demo Mode")
             )
         st.markdown(result.reply)
         render_activity(result.activity, result.mode)
-
-    st.session_state.messages.append(
-        {
-            "role": "assistant",
-            "content": result.reply,
-            "activity": result.activity,
-            "mode": result.mode,
-        }
-    )
+    st.session_state.messages.append({
+        "role": "assistant", "content": result.reply,
+        "activity": result.activity, "mode": result.mode,
+    })
 
 
-def render_chat_tab() -> None:
-    st.markdown('<div class="section-title">Chat with your task agent</div>', unsafe_allow_html=True)
-    st.caption("Use natural language. The agent will decide which task tool to run.")
-
-    quick_columns = st.columns(4)
-    quick_prompts = [
-        ("➕ Add sample", "Add final presentation for tomorrow"),
-        ("📋 Pending", "Show my pending tasks"),
-        ("✅ Completed", "Show my completed tasks"),
-        ("🧭 Help", "What can you do?"),
+def render_chat_page() -> None:
+    render_header("YOUR AI WORKSPACE", "AI Assistant", "Tell TaskBot what you need to get done. It can manage your tasks using natural language.")
+    st.markdown('<div class="chat-intro"> <span class="online-dot"></span> TaskBot is ready to help</div>', unsafe_allow_html=True)
+    suggestions = [
+        ("＋  Add a task", "Add my project assignment for tomorrow"),
+        ("▤  Pending tasks", "Show my pending tasks"),
+        ("✓  Completed", "Show my completed tasks"),
+        ("✦  Help me", "What can you do?"),
     ]
-
-    selected_prompt = None
-    for column, (label, prompt) in zip(quick_columns, quick_prompts):
-        with column:
-            if st.button(label, use_container_width=True):
-                selected_prompt = prompt
+    cols = st.columns(4)
+    chosen = None
+    for col, (label, prompt) in zip(cols, suggestions):
+        with col:
+            if st.button(label, key=f"suggest_{label}", use_container_width=True):
+                chosen = prompt
 
     for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
+        avatar = "🤖" if message["role"] == "assistant" else "🙂"
+        with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
             if message["role"] == "assistant":
-                render_activity(
-                    message.get("activity", []),
-                    message.get("mode", "Agent"),
-                )
+                render_activity(message.get("activity", []), message.get("mode", "TaskBot"))
 
-    typed_prompt = st.chat_input("Example: Add project report for Friday")
-    prompt = typed_prompt or selected_prompt
-
+    typed = st.chat_input("Message TaskBot...  (e.g. Add project report for Friday)")
+    prompt = typed or chosen
     if prompt:
-        save_and_render_user_message(prompt)
+        st.session_state.messages.append({
+            "role": "user", "content": prompt, "activity": [], "mode": ""
+        })
         process_and_save_assistant_message(prompt)
         st.rerun()
 
@@ -250,109 +208,112 @@ def render_chat_tab() -> None:
 def render_task_card(task: dict) -> None:
     safe_title = html.escape(str(task["title"]))
     safe_deadline = html.escape(str(task["deadline"]))
-    safe_priority = html.escape(str(task["priority"]))
-    safe_status = html.escape(str(task["status"]))
-
+    priority = str(task["priority"])
+    status = str(task["status"])
+    priority_class = priority.lower() if priority.lower() in {"low", "medium", "high"} else "medium"
+    status_class = "completed" if status == "Completed" else "pending"
     st.markdown(
-        f"""
-        <div class="task-card">
-            <div class="task-title">#{task["id"]} · {safe_title}</div>
-            <div class="task-meta">
-                <span class="pill">{safe_status}</span>
-                <span class="pill">{safe_priority} priority</span><br><br>
-                Deadline: <strong>{safe_deadline}</strong>
-            </div>
-        </div>
-        """,
+        f'<div class="task-row"><div class="task-main"><div class="task-name">{safe_title}</div>'
+        f'<div class="task-sub">Task #{task["id"]} · Due {safe_deadline}</div></div>'
+        f'<div class="task-tags"><span class="tag {priority_class}">{html.escape(priority)} priority</span>'
+        f'<span class="tag {status_class}">{html.escape(status)}</span></div></div>',
         unsafe_allow_html=True,
     )
 
 
-def render_tasks_tab() -> None:
-    st.markdown('<div class="section-title">Task dashboard</div>', unsafe_allow_html=True)
-
-    status_filter = st.segmented_control(
-        "Filter tasks",
-        options=["All", "Pending", "Completed"],
-        default="All",
-    )
-    tasks = list_tasks(status_filter or "All")
-
-    if not tasks:
-        st.info("No tasks are available in this section.")
+def render_tasks_page() -> None:
+    render_header("STAY ON TRACK", "My Tasks", "A clear view of everything on your plate.")
+    tasks = list_tasks("All")
+    left, right = st.columns([2, 1])
+    with left:
+        search = st.text_input("Search tasks", placeholder="Search by task name...", label_visibility="collapsed")
+    with right:
+        status_filter = st.selectbox("Status", ["All", "Pending", "Completed"])
+    priority_filter = st.selectbox("Priority", ["All priorities", "High", "Medium", "Low"], label_visibility="collapsed")
+    filtered = [
+        task for task in tasks
+        if search.lower() in task["title"].lower()
+        and (status_filter == "All" or task["status"] == status_filter)
+        and (priority_filter == "All priorities" or task["priority"] == priority_filter)
+    ]
+    st.caption(f"Showing {len(filtered)} of {len(tasks)} tasks")
+    if not filtered:
+        st.info("No matching tasks. Try changing your search or filters.")
         return
-
-    for task in tasks:
-        left, complete_column, delete_column = st.columns([7, 1.25, 1.25])
-        with left:
+    for task in filtered:
+        a, b, c = st.columns([7, 1.2, 1.0], vertical_alignment="center")
+        with a:
             render_task_card(task)
-
-        with complete_column:
-            st.write("")
-            st.write("")
-            if task["status"] == "Pending":
-                if st.button(
-                    "Complete",
-                    key=f'complete_{task["id"]}',
-                    use_container_width=True,
-                ):
-                    complete_task_by_id(task["id"])
-                    st.toast("Task completed")
+        with b:
+            if task["status"] == "Pending" and st.button("Complete", key=f"done_{task['id']}", use_container_width=True):
+                complete_task_by_id(task["id"])
+                st.toast("Task completed")
+                st.rerun()
+        with c:
+            if st.button("Delete", key=f"remove_{task['id']}", use_container_width=True):
+                st.session_state[f"confirm_delete_{task['id']}"] = True
+        if st.session_state.get(f"confirm_delete_{task['id']}", False):
+            st.warning(f'Delete “{task["title"]}”? This cannot be undone.')
+            yes, no = st.columns(2)
+            with yes:
+                if st.button("Yes, delete", key=f"yes_delete_{task['id']}"):
+                    delete_task_by_id(task["id"])
+                    st.session_state.pop(f"confirm_delete_{task['id']}", None)
+                    st.toast("Task deleted")
+                    st.rerun()
+            with no:
+                if st.button("Cancel", key=f"cancel_delete_{task['id']}"):
+                    st.session_state.pop(f"confirm_delete_{task['id']}", None)
                     st.rerun()
 
-        with delete_column:
-            st.write("")
-            st.write("")
-            if st.button(
-                "Delete",
-                key=f'delete_{task["id"]}',
-                use_container_width=True,
-            ):
-                delete_task_by_id(task["id"])
-                st.toast("Task deleted")
-                st.rerun()
+
+def render_overview_page() -> None:
+    render_header("YOUR PRODUCTIVITY, AT A GLANCE", "Good to see you 👋", "Plan your work, stay focused, and let TaskBot handle the task updates.")
+    render_stats()
+    st.markdown('<div class="section-heading">A little help to get started</div>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown('<div class="feature-card"><div class="feature-icon">✦</div><h3>Talk to your assistant</h3><p>Add, complete, or find tasks with a simple message. No forms to fill in.</p></div>', unsafe_allow_html=True)
+        if st.button("Open AI Assistant →", use_container_width=True):
+            st.session_state.active_page = "AI Assistant"
+            st.rerun()
+    with col2:
+        st.markdown('<div class="feature-card"><div class="feature-icon">▤</div><h3>Organise your tasks</h3><p>Search your task list, filter by status or priority, and mark work as complete.</p></div>', unsafe_allow_html=True)
+        if st.button("View my tasks →", use_container_width=True):
+            st.session_state.active_page = "My Tasks"
+            st.rerun()
+    recent = list_tasks("All")[:5]
+    st.markdown('<div class="section-heading">Recent tasks</div>', unsafe_allow_html=True)
+    if recent:
+        for task in recent:
+            render_task_card(task)
+    else:
+        st.info("Your task list is empty. Start by asking TaskBot to add your first task.")
 
 
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "assistant",
-            "content": (
-                "Hello! I am **TaskBot AI**. I can add, show, "
-                "complete, and delete your tasks."
-            ),
-            "activity": [
-                "Application started",
-                "Connected to the SQLite task database",
-            ],
-            "mode": "TaskBot",
-        }
+def render_about_page() -> None:
+    render_header("BEHIND THE ASSISTANT", "How TaskBot works", "A conversational task manager powered by AI function calling and a local SQLite database.")
+    steps = [
+        ("01", "Understand", "TaskBot reads your natural-language message and identifies what you want to do."),
+        ("02", "Choose a tool", "The AI selects add_task, list_tasks, complete_task, or delete_task when needed."),
+        ("03", "Take action", "Python executes the selected function and reads or updates your SQLite database."),
+        ("04", "Respond", "TaskBot explains the result and shows the activity performed."),
     ]
+    for number, title, description in steps:
+        st.markdown(f'<div class="workflow-step"><span>{number}</span><div><strong>{title}</strong><p>{description}</p></div></div>', unsafe_allow_html=True)
+    st.markdown("**Available providers:** Auto Mode (Groq with Gemini backup), Groq Mode, Gemini Mode, and Demo Mode.")
 
-render_sidebar()
-render_hero()
-render_stats()
 
-chat_tab, tasks_tab, about_tab = st.tabs(["💬 AI Chat", "📌 Tasks", "ℹ️ About"])
+initialize_state()
+page = render_sidebar()
 
-with chat_tab:
-    render_chat_tab()
+if page == "Overview":
+    render_overview_page()
+elif page == "AI Assistant":
+    render_chat_page()
+elif page == "My Tasks":
+    render_tasks_page()
+else:
+    render_about_page()
 
-with tasks_tab:
-    render_tasks_tab()
-
-with about_tab:
-    st.markdown("## How the agent works")
-    st.markdown(
-        """
-        1. The user sends a natural-language request.
-        2. TaskBot identifies the user's intention.
-        3. It selects one tool: `add_task`, `list_tasks`,
-           `complete_task`, or `delete_task`.
-        4. The selected tool changes or reads the SQLite database.
-        5. The chatbot explains the result and displays its activity steps.
-
-        **Demo mode** uses a local intent detector and costs nothing.
-        **OpenAI Mode** and **Groq Mode** use model function calling for better language understanding.
-        """
-    )
+st.markdown('<div class="app-footer">TaskBot AI · Built to make everyday task management simpler</div>', unsafe_allow_html=True)
