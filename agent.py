@@ -667,52 +667,5 @@ def process_message(message: str, mode: str = "Demo Mode") -> AgentResult:
                 mode="Groq · Error",
             )
 
-    if mode in ("OpenAI Mode", "AI Mode"):
-        if not os.getenv("OPENAI_API_KEY", "").strip():
-            return AgentResult(
-                reply=(
-                    "⚠️ **OpenAI API key is missing.** Add OPENAI_API_KEY to "
-                    "your `.env` file or Streamlit Cloud Secrets, then restart the app."
-                ),
-                activity=["OpenAI Mode selected", "API key not found"],
-                mode="OpenAI · Not configured",
-            )
-
-        try:
-            return _openai_agent(message)
-        except ProviderUnavailableError as error:
-            # The initial OpenAI request failed before task tools could run.
-            # Try Groq so an exhausted OpenAI balance does not stop the bot.
-            if os.getenv("GROQ_API_KEY", "").strip():
-                try:
-                    result = _groq_agent(message)
-                    result.activity.insert(0, "OpenAI was unavailable; Groq handled the request")
-                    result.mode = f"Fallback · {result.mode}"
-                    return result
-                except Exception as backup_error:
-                    return AgentResult(
-                        reply=f"⚠️ OpenAI and Groq are both unavailable. OpenAI: {error}. Groq: {backup_error}",
-                        activity=["OpenAI request failed", "Groq backup failed"],
-                        mode="Both providers · Error",
-                    )
-            return AgentResult(
-                reply=(
-                    "⚠️ **OpenAI API quota or connection failed.** Add GROQ_API_KEY "
-                    "to enable Groq backup, or check your OpenAI API billing.\n\n"
-                    f"**Error details:** {error}"
-                ),
-                activity=["OpenAI Mode selected", "OpenAI request failed", "No Groq backup key configured"],
-                mode="OpenAI · Error",
-            )
-        except Exception as error:
-            return AgentResult(
-                reply=(
-                    "⚠️ **OpenAI failed after processing started.** No provider "
-                    "retry was made because a task action may already have run.\n\n"
-                    f"**Error details:** {error}"
-                ),
-                activity=["OpenAI Mode selected", "OpenAI request failed after initial response"],
-                mode="OpenAI · Error",
-            )
 
     return _demo_agent(message)
