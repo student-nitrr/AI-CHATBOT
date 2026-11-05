@@ -49,10 +49,12 @@ def render_sidebar() -> str:
         default_mode = "Auto Mode"
     elif configured_provider == "groq" and groq_key:
         default_mode = "Groq Mode"
+    elif configured_provider == "gemini" and gemini_key:
+        default_mode = "Gemini Mode"
     else:
         default_mode = "Demo Mode"
 
-    modes = ["Demo Mode", "Auto Mode", "Groq Mode"]
+    modes = ["Demo Mode", "Auto Mode", "Groq Mode", "Gemini Mode"]
 
     with st.sidebar:
         st.markdown('<div class="sidebar-logo">🤖 TaskBot AI</div>', unsafe_allow_html=True)
@@ -79,6 +81,13 @@ def render_sidebar() -> str:
                 st.success(f"Groq Mode is ready · {model}")
             else:
                 st.warning("Add GROQ_API_KEY to your .env file or Streamlit Cloud Secrets.")
+        elif selected_mode == "Gemini Mode":
+            model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+            mode_text = f"Gemini · {model}"
+            if gemini_key:
+                st.success(f"Gemini Mode is ready · {model}")
+            else:
+                st.warning("Add GEMINI_API_KEY to your .env file or Streamlit Cloud Secrets.")
         else:
             mode_text = "Free local demo mode"
             st.caption("Demo Mode runs locally and does not use an API key.")
