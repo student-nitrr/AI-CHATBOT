@@ -39,7 +39,7 @@ inject_css(st)
 init_db()
 
 WELCOME = (
-    "Hey! I'm **TaskBot AI** 👋\\n\\n"
+    "Hey! I'm **TaskBot AI** 👋\n\n"
     "I can add tasks, check your pending work, complete tasks, and keep your day organised. "
     "What would you like to do?"
 )
