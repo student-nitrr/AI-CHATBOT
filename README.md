@@ -22,7 +22,8 @@ The chatbot follows an action loop:
 - Agent activity panel
 - Free local demo mode
 - Optional Groq function-calling mode
-- Auto Mode: tries Groq first and OpenAI as a backup
+- Gemini function-calling backup
+- Auto Mode: tries Groq first and Gemini as a backup
 
 ## Commands to try
 
@@ -83,13 +84,13 @@ streamlit run app.py
 ```env
 AI_PROVIDER=groq
 GROQ_API_KEY=your_real_groq_key_here
-GROQ_MODEL=openai/gpt-oss-120b
+GROQ_MODEL=gemini/gpt-oss-120b
 ```
 
 4. Install the dependencies with `pip install -r requirements.txt`.
 5. Restart Streamlit and select **Groq Mode** or **Auto Mode** in the sidebar.
 
-## Configure Groq on Streamlit Community Cloud
+## Configure Groq and Gemini on Streamlit Community Cloud
 
 Open your app's **Manage app → Settings → Secrets** and add:
 
@@ -97,13 +98,13 @@ Open your app's **Manage app → Settings → Secrets** and add:
 AI_PROVIDER = "auto"
 GROQ_API_KEY = "your_real_groq_key_here"
 GROQ_MODEL = "openai/gpt-oss-120b"
-OPENAI_API_KEY = "your_real_openai_key_here"
-OPENAI_MODEL = "gpt-5.4-mini"
+GEMINI_API_KEY = "your_real_gemini_key_here"
+GEMINI_MODEL = "gemini-2.5-flash"
 ```
 
-Save the secrets and restart the app if it does not restart automatically. Select **Auto Mode** in the sidebar to use Groq first and OpenAI as backup. The API keys are read from Streamlit Secrets at runtime; they should never be committed to GitHub.
+Save the secrets and restart the app if it does not restart automatically. Select **Auto Mode** in the sidebar to use Groq first and Gemini as backup. The API keys are read from Streamlit Secrets at runtime; they should never be committed to GitHub.
 
-You can select **Demo Mode** whenever you want to use the free local intent detector. Demo Mode never uses an API. In Auto Mode, TaskBot tries Groq first and falls back to OpenAI only when Groq's first API request fails. It deliberately does not retry with another provider after a task tool may have executed, preventing duplicate task actions. In Groq Mode, OpenAI can also act as a backup if Groq’s initial API request fails. OpenAI is not offered as a separate selectable mode.
+You can select **Demo Mode** whenever you want to use the free local intent detector. Demo Mode never uses an API. In Auto Mode, TaskBot tries Groq first and falls back to Gemini only when Groq's first API request fails. It deliberately does not retry with another provider after a task tool may have executed, preventing duplicate task actions. In Groq Mode, Gemini can also act as a backup if Groq’s initial API request fails. Gemini is not offered as a separate selectable mode.
 
 Never upload `.env` to GitHub or share your API key. API usage and quotas depend on the provider and account.
 
