@@ -117,7 +117,7 @@ OPENAI_MODEL=gpt-5.4-mini
 
 3. Restart Streamlit and select **OpenAI Mode** in the sidebar.
 
-You can select **Demo Mode** whenever you want to use the free local intent detector. The app displays an error if a selected provider is not configured or its request fails; it does not silently switch to Demo Mode.
+You can select **Demo Mode** whenever you want to use the free local intent detector. Demo Mode never uses an API. In Auto Mode, TaskBot tries Groq first and falls back to OpenAI only when Groq's first API request fails. It deliberately does not retry with another provider after a task tool may have executed, preventing duplicate task actions. In the individual OpenAI and Groq modes, provider errors are displayed directly.
 
 Never upload `.env` to GitHub or share your API key. API usage and quotas depend on the provider and account.
 
