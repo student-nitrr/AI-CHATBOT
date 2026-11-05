@@ -21,7 +21,7 @@ load_dotenv()
 # Load Streamlit Community Cloud secrets when the app is deployed.
 # Local runs can continue using the .env file.
 try:
-    for key in ("AI_PROVIDER", "USE_OPENAI", "OPENAI_API_KEY", "OPENAI_MODEL", "GROQ_API_KEY", "GROQ_MODEL"):
+    for key in ("AI_PROVIDER", "GROQ_API_KEY", "GROQ_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL"):
         if key in st.secrets:
             os.environ[key] = str(st.secrets[key])
 except Exception:
@@ -40,15 +40,12 @@ init_db()
 
 
 def render_sidebar() -> str:
-    openai_key = bool(os.getenv("OPENAI_API_KEY", "").strip())
     groq_key = bool(os.getenv("GROQ_API_KEY", "").strip())
     configured_provider = os.getenv("AI_PROVIDER", "").strip().lower()
 
     # Keep compatibility with the earlier OpenAI configuration.
-    if not configured_provider and os.getenv("USE_OPENAI", "false").strip().lower() == "true":
-        configured_provider = "openai"
-
-    if configured_provider == "auto" and (groq_key or openai_key):
+    gemini_key = bool(os.getenv("GEMINI_API_KEY", "").strip())
+    if configured_provider == "auto" and (groq_key or gemini_key):
         default_mode = "Auto Mode"
     elif configured_provider == "groq" and groq_key:
         default_mode = "Groq Mode"
@@ -68,14 +65,13 @@ def render_sidebar() -> str:
 
         if selected_mode == "Auto Mode":
             groq_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-            openai_model = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
-            mode_text = "Auto · Groq with OpenAI backup"
-            if groq_key and openai_key:
-                st.success("Auto Mode is ready · Groq primary, OpenAI backup")
-            elif groq_key or openai_key:
+            mode_text = "Auto · Groq with Gemini backup"
+            if groq_key and gemini_key:
+                st.success("Auto Mode is ready · Groq primary, Gemini backup")
+            elif groq_key or gemini_key:
                 st.info("Auto Mode is ready with one configured provider.")
             else:
-                st.warning("Add GROQ_API_KEY and/or OPENAI_API_KEY to Streamlit Secrets.")
+                st.warning("Add GROQ_API_KEY and/or GEMINI_API_KEY to Streamlit Secrets.")
         elif selected_mode == "Groq Mode":
             model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
             mode_text = f"Groq · {model}"
