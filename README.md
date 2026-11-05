@@ -88,7 +88,7 @@ GROQ_MODEL=openai/gpt-oss-120b
 ```
 
 4. Install the dependencies with `pip install -r requirements.txt`.
-5. Restart Streamlit and select **Groq Mode** or **Auto Mode** in the sidebar.
+5. Restart Streamlit and select **Groq Mode**, **Gemini Mode**, or **Auto Mode** in the sidebar.
 
 ## Configure Groq and Gemini on Streamlit Community Cloud
 
@@ -99,12 +99,12 @@ AI_PROVIDER = "auto"
 GROQ_API_KEY = "your_real_groq_key_here"
 GROQ_MODEL = "openai/gpt-oss-120b"
 GEMINI_API_KEY = "your_real_gemini_key_here"
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.8-flash"
 ```
 
 Save the secrets and restart the app if it does not restart automatically. Select **Auto Mode** in the sidebar to use Groq first and Gemini as backup. The API keys are read from Streamlit Secrets at runtime; they should never be committed to GitHub.
 
-You can select **Demo Mode** whenever you want to use the free local intent detector. Demo Mode never uses an API. In Auto Mode, TaskBot tries Groq first and falls back to Gemini only when Groq's first API request fails. It deliberately does not retry with another provider after a task tool may have executed, preventing duplicate task actions. In Groq Mode, Gemini can also act as a backup if Groq’s initial API request fails. Gemini is not offered as a separate selectable mode.
+You can select **Demo Mode** whenever you want to use the free local intent detector. Demo Mode never uses an API. In Auto Mode, TaskBot tries Groq first and falls back to Gemini only when Groq's first API request fails. It deliberately does not retry with another provider after a task tool may have executed, preventing duplicate task actions. In Groq Mode, Gemini can also act as a backup if Groq’s initial API request fails. Gemini is also available as a separate selectable mode.
 
 Never upload `.env` to GitHub or share your API key. API usage and quotas depend on the provider and account.
 
