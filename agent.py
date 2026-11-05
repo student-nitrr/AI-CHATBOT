@@ -692,9 +692,23 @@ def process_message(message: str, mode: str = "Demo Mode") -> AgentResult:
         try:
             return _gemini_agent(message)
         except ProviderUnavailableError as error:
+            # Gemini's initial request failed (for example, temporary 503 overload).
+            # No task tool has run yet, so it is safe to try Groq once.
+            if groq_key:
+                try:
+                    result = _groq_agent(message)
+                    result.activity.insert(0, "Gemini was unavailable; Groq handled the request")
+                    result.mode = f"Fallback · {result.mode}"
+                    return result
+                except Exception as backup_error:
+                    return AgentResult(
+                        reply=f"⚠️ Gemini and Groq are currently unavailable. Gemini: {error}. Groq: {backup_error}",
+                        activity=["Gemini request failed", "Groq backup failed"],
+                        mode="Both providers · Error",
+                    )
             return AgentResult(
-                reply=f"⚠️ Could not connect to Gemini. Check your API key, model, and quota. Error: {error}",
-                activity=["Gemini Mode selected", "Gemini request failed"],
+                reply=f"⚠️ Gemini is temporarily unavailable and no Groq backup key is configured. Try again shortly. Error: {error}",
+                activity=["Gemini Mode selected", "Gemini request failed", "No Groq backup key"],
                 mode="Gemini · Error",
             )
         except Exception as error:
