@@ -632,16 +632,38 @@ def process_message(message: str, mode: str = "Demo Mode") -> AgentResult:
 
         try:
             return _groq_agent(message)
+        except ProviderUnavailableError as error:
+            # The first model request failed before any task tool could run.
+            # Safely try OpenAI as a backup when Groq is unavailable.
+            if os.getenv("OPENAI_API_KEY", "").strip():
+                try:
+                    result = _openai_agent(message)
+                    result.activity.insert(0, "Groq was unavailable; OpenAI handled the request")
+                    result.mode = f"Fallback · {result.mode}"
+                    return result
+                except Exception as backup_error:
+                    return AgentResult(
+                        reply=f"⚠️ Groq and OpenAI are both unavailable. Groq: {error}. OpenAI: {backup_error}",
+                        activity=["Groq request failed", "OpenAI backup failed"],
+                        mode="Both providers · Error",
+                    )
+            return AgentResult(
+                reply=(
+                    "⚠️ **Could not connect to Groq.** Check your API key, "
+                    "quota, and model. Add OPENAI_API_KEY to enable OpenAI backup.\n\n"
+                    f"**Error details:** {error}"
+                ),
+                activity=["Groq Mode selected", "Groq request failed", "No OpenAI backup key configured"],
+                mode="Groq · Error",
+            )
         except Exception as error:
             return AgentResult(
                 reply=(
-                    "⚠️ **Could not connect to Groq.** Your request was not "
-                    "run in Demo Mode. Check that your Groq API key is valid, "
-                    "your account has available API quota, and GROQ_MODEL is "
-                    "a currently supported model.\n\n"
+                    "⚠️ **Groq failed after processing started.** No provider "
+                    "retry was made because a task action may already have run.\n\n"
                     f"**Error details:** {error}"
                 ),
-                activity=["Groq Mode selected", "Groq request failed"],
+                activity=["Groq Mode selected", "Groq request failed after initial response"],
                 mode="Groq · Error",
             )
 
@@ -658,16 +680,38 @@ def process_message(message: str, mode: str = "Demo Mode") -> AgentResult:
 
         try:
             return _openai_agent(message)
+        except ProviderUnavailableError as error:
+            # The initial OpenAI request failed before task tools could run.
+            # Try Groq so an exhausted OpenAI balance does not stop the bot.
+            if os.getenv("GROQ_API_KEY", "").strip():
+                try:
+                    result = _groq_agent(message)
+                    result.activity.insert(0, "OpenAI was unavailable; Groq handled the request")
+                    result.mode = f"Fallback · {result.mode}"
+                    return result
+                except Exception as backup_error:
+                    return AgentResult(
+                        reply=f"⚠️ OpenAI and Groq are both unavailable. OpenAI: {error}. Groq: {backup_error}",
+                        activity=["OpenAI request failed", "Groq backup failed"],
+                        mode="Both providers · Error",
+                    )
+            return AgentResult(
+                reply=(
+                    "⚠️ **OpenAI API quota or connection failed.** Add GROQ_API_KEY "
+                    "to enable Groq backup, or check your OpenAI API billing.\n\n"
+                    f"**Error details:** {error}"
+                ),
+                activity=["OpenAI Mode selected", "OpenAI request failed", "No Groq backup key configured"],
+                mode="OpenAI · Error",
+            )
         except Exception as error:
             return AgentResult(
                 reply=(
-                    "⚠️ **Could not connect to OpenAI.** Your request was not "
-                    "run in Demo Mode. Check that your API key is valid, your "
-                    "account has API billing/credits available, and the model "
-                    "name is supported.\n\n"
+                    "⚠️ **OpenAI failed after processing started.** No provider "
+                    "retry was made because a task action may already have run.\n\n"
                     f"**Error details:** {error}"
                 ),
-                activity=["OpenAI Mode selected", "OpenAI request failed"],
+                activity=["OpenAI Mode selected", "OpenAI request failed after initial response"],
                 mode="OpenAI · Error",
             )
 
