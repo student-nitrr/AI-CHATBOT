@@ -682,6 +682,28 @@ def process_message(message: str, mode: str = "Demo Mode") -> AgentResult:
             mode="Auto · Not configured",
         )
 
+    if mode == "Gemini Mode":
+        if not gemini_key:
+            return AgentResult(
+                reply="⚠️ Add GEMINI_API_KEY to Streamlit Secrets or your .env file.",
+                activity=["Gemini Mode selected", "API key not found"],
+                mode="Gemini · Not configured",
+            )
+        try:
+            return _gemini_agent(message)
+        except ProviderUnavailableError as error:
+            return AgentResult(
+                reply=f"⚠️ Could not connect to Gemini. Check your API key, model, and quota. Error: {error}",
+                activity=["Gemini Mode selected", "Gemini request failed"],
+                mode="Gemini · Error",
+            )
+        except Exception as error:
+            return AgentResult(
+                reply=f"⚠️ Gemini failed after processing started. No retry was made to avoid duplicate task actions. Error: {error}",
+                activity=["Gemini Mode selected", "Gemini request failed after initial response"],
+                mode="Gemini · Error",
+            )
+
     if mode == "Groq Mode":
         if not groq_key:
             return AgentResult(
