@@ -45,6 +45,19 @@ WELCOME = (
 )
 
 
+def go_to_page(page_name: str) -> None:
+    """Update navigation through a button callback before the next rerun."""
+    st.session_state["active_page"] = page_name
+
+
+def start_new_conversation() -> None:
+    st.session_state["messages"] = [{
+        "role": "assistant", "content": WELCOME,
+        "activity": [], "mode": "TaskBot",
+    }]
+    st.session_state["active_page"] = "AI Assistant"
+
+
 def initialize_state() -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = [{
@@ -107,13 +120,11 @@ def render_sidebar() -> str:
             st.caption("Local demo · No API usage")
 
         st.markdown('<div class="sidebar-tip"><strong>Quick tip</strong><br>Try “Add assignment for Friday” or “Show my pending tasks”.</div>', unsafe_allow_html=True)
-        if st.button("＋  New conversation", use_container_width=True):
-            st.session_state.messages = [{
-                "role": "assistant", "content": WELCOME,
-                "activity": [], "mode": "TaskBot",
-            }]
-            st.session_state.active_page = "AI Assistant"
-            st.rerun()
+        st.button(
+            "＋  New conversation",
+            use_container_width=True,
+            on_click=start_new_conversation,
+        )
     return page
 
 
@@ -274,14 +285,20 @@ def render_overview_page() -> None:
     col1, col2 = st.columns(2)
     with col1:
         st.markdown('<div class="feature-card"><div class="feature-icon">✦</div><h3>Talk to your assistant</h3><p>Add, complete, or find tasks with a simple message. No forms to fill in.</p></div>', unsafe_allow_html=True)
-        if st.button("Open AI Assistant →", use_container_width=True):
-            st.session_state.active_page = "AI Assistant"
-            st.rerun()
+        st.button(
+            "Open AI Assistant →",
+            use_container_width=True,
+            on_click=go_to_page,
+            args=("AI Assistant",),
+        )
     with col2:
         st.markdown('<div class="feature-card"><div class="feature-icon">▤</div><h3>Organise your tasks</h3><p>Search your task list, filter by status or priority, and mark work as complete.</p></div>', unsafe_allow_html=True)
-        if st.button("View my tasks →", use_container_width=True):
-            st.session_state.active_page = "My Tasks"
-            st.rerun()
+        st.button(
+            "View my tasks →",
+            use_container_width=True,
+            on_click=go_to_page,
+            args=("My Tasks",),
+        )
     recent = list_tasks("All")[:5]
     st.markdown('<div class="section-heading">Recent tasks</div>', unsafe_allow_html=True)
     if recent:
