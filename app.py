@@ -334,6 +334,72 @@ def render_tasks_page() -> None:
                     st.rerun()
 
 
+def render_history_page() -> None:
+    render_header("YOUR SAVED CHATS", "Chat History", "Reopen, rename, or delete your previous conversations.")
+    session_id = st.session_state.chat_session_id
+    conversations = list_conversations(session_id)
+
+    if not conversations:
+        st.info("No saved conversations yet. Start a new conversation with TaskBot.")
+        return
+
+    for conversation in conversations:
+        conversation_id = conversation["id"]
+        title = conversation["title"]
+        messages = get_conversation_messages(conversation_id, session_id)
+        last_user_message = next(
+            (item.get("content", "") for item in reversed(messages) if item.get("role") == "user"),
+            "No messages yet",
+        )
+        preview = str(last_user_message).replace(chr(10), " ")[:100]
+
+        with st.container(border=True):
+            st.markdown("**" + html.escape(title) + "**")
+            st.caption(
+                str(len(messages)) + " messages · Updated "
+                + html.escape(conversation["updated_at"])
+            )
+            st.write(preview)
+            open_col, rename_col, delete_col = st.columns([1, 1, 1])
+            with open_col:
+                if st.button("Continue chat", key="open_chat_" + str(conversation_id), use_container_width=True):
+                    open_conversation(conversation_id)
+                    st.rerun()
+            with rename_col:
+                with st.popover("Rename", use_container_width=True):
+                    new_title = st.text_input(
+                        "Conversation name",
+                        value=title,
+                        max_chars=80,
+                        key="rename_text_" + str(conversation_id),
+                    )
+                    if st.button("Save name", key="save_rename_" + str(conversation_id), use_container_width=True):
+                        try:
+                            rename_conversation(conversation_id, session_id, new_title)
+                            st.toast("Conversation renamed")
+                            st.rerun()
+                        except ValueError as error:
+                            st.error(str(error))
+            with delete_col:
+                if st.button("Delete", key="delete_chat_" + str(conversation_id), use_container_width=True):
+                    st.session_state["confirm_chat_delete_" + str(conversation_id)] = True
+
+            if st.session_state.get("confirm_chat_delete_" + str(conversation_id), False):
+                st.warning("Delete this conversation and all its messages?")
+                yes_col, no_col = st.columns(2)
+                with yes_col:
+                    if st.button("Confirm delete", key="confirm_chat_yes_" + str(conversation_id)):
+                        delete_conversation(conversation_id, session_id)
+                        st.session_state.pop("confirm_chat_delete_" + str(conversation_id), None)
+                        if st.session_state.current_conversation_id == conversation_id:
+                            start_new_conversation()
+                        st.rerun()
+                with no_col:
+                    if st.button("Cancel", key="confirm_chat_no_" + str(conversation_id)):
+                        st.session_state.pop("confirm_chat_delete_" + str(conversation_id), None)
+                        st.rerun()
+
+
 def render_overview_page() -> None:
     render_header("", "Good to see you 👋", "Plan your work, stay focused, and let TaskBot handle the task updates.")
     render_stats()
@@ -386,6 +452,8 @@ elif page == "AI Assistant":
     render_chat_page()
 elif page == "My Tasks":
     render_tasks_page()
+elif page == "Chat History":
+    render_history_page()
 else:
     render_about_page()
 
