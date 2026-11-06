@@ -335,7 +335,7 @@ def render_tasks_page() -> None:
 
 
 def render_history_page() -> None:
-    render_header("YOUR SAVED CHATS", "Chat History", "Reopen, rename, or delete your previous conversations.")
+    render_header("", "Chat History", "Reopen, rename, or delete your previous conversations.")
     session_id = st.session_state.chat_session_id
     conversations = list_conversations(session_id)
 
