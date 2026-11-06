@@ -362,9 +362,13 @@ def render_history_page() -> None:
             st.write(preview)
             open_col, rename_col, delete_col = st.columns([1, 1, 1])
             with open_col:
-                if st.button("Continue chat", key="open_chat_" + str(conversation_id), use_container_width=True):
-                    open_conversation(conversation_id)
-                    st.rerun()
+                st.button(
+                    "Continue chat",
+                    key="open_chat_" + str(conversation_id),
+                    use_container_width=True,
+                    on_click=open_conversation,
+                    args=(conversation_id,),
+                )
             with rename_col:
                 with st.popover("Rename", use_container_width=True):
                     new_title = st.text_input(
