@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import os
+import uuid
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -13,6 +14,12 @@ from database import (
     get_stats,
     init_db,
     list_tasks,
+    create_conversation,
+    list_conversations,
+    get_conversation_messages,
+    save_conversation_message,
+    rename_conversation,
+    delete_conversation,
 )
 from styles import inject_css
 
@@ -51,21 +58,54 @@ def go_to_page(page_name: str) -> None:
 
 
 def start_new_conversation() -> None:
-    st.session_state["messages"] = [{
+    session_id = st.session_state["chat_session_id"]
+    conversation_id = create_conversation(session_id)
+    st.session_state["current_conversation_id"] = conversation_id
+    first_message = {
         "role": "assistant", "content": WELCOME,
         "activity": [], "mode": "TaskBot",
-    }]
+    }
+    st.session_state["messages"] = [first_message]
+    save_conversation_message(conversation_id, session_id, first_message)
     st.session_state["active_page"] = "AI Assistant"
 
 
+def open_conversation(conversation_id: int) -> None:
+    session_id = st.session_state["chat_session_id"]
+    messages = get_conversation_messages(conversation_id, session_id)
+    if messages:
+        st.session_state["current_conversation_id"] = conversation_id
+        st.session_state["messages"] = messages
+        st.session_state["active_page"] = "AI Assistant"
+
+
+def append_chat_message(message: dict) -> None:
+    st.session_state.messages.append(message)
+    save_conversation_message(
+        st.session_state["current_conversation_id"],
+        st.session_state["chat_session_id"],
+        message,
+    )
+
+
 def initialize_state() -> None:
+    if "chat_session_id" not in st.session_state:
+        st.session_state.chat_session_id = str(uuid.uuid4())
+    if "current_conversation_id" not in st.session_state:
+        st.session_state.current_conversation_id = create_conversation(st.session_state.chat_session_id)
     if "messages" not in st.session_state:
-        st.session_state.messages = [{
+        first_message = {
             "role": "assistant",
             "content": WELCOME,
             "activity": ["Workspace ready", "Connected to SQLite task database"],
             "mode": "TaskBot",
-        }]
+        }
+        st.session_state.messages = [first_message]
+        save_conversation_message(
+            st.session_state.current_conversation_id,
+            st.session_state.chat_session_id,
+            first_message,
+        )
     if "agent_mode" not in st.session_state:
         st.session_state.agent_mode = "Auto Mode"
 
@@ -91,7 +131,7 @@ def render_sidebar() -> str:
         st.markdown('<div class="side-label">WORKSPACE</div>', unsafe_allow_html=True)
         page = st.radio(
             "Navigation",
-            ["Overview", "AI Assistant", "My Tasks", "About"],
+            ["Overview", "AI Assistant", "My Tasks", "Chat History", "About"],
             label_visibility="collapsed",
             key="active_page",
         )
@@ -187,7 +227,7 @@ def process_and_save_assistant_message(message: str) -> None:
             )
         st.markdown(result.reply)
         render_activity(result.activity, result.mode)
-    st.session_state.messages.append({
+    append_chat_message({
         "role": "assistant", "content": result.reply,
         "activity": result.activity, "mode": result.mode,
     })
@@ -219,9 +259,15 @@ def render_chat_page() -> None:
     typed = st.chat_input("Message TaskBot...  (e.g. Add project report for Friday)")
     prompt = typed or chosen
     if prompt:
-        st.session_state.messages.append({
+        append_chat_message({
             "role": "user", "content": prompt, "activity": [], "mode": ""
         })
+        conversations = list_conversations(st.session_state.chat_session_id)
+        current = next((item for item in conversations if item["id"] == st.session_state.current_conversation_id), None)
+        if current and current["title"] == "New conversation":
+            short_title = prompt.strip().replace(chr(10), " ")[:42]
+            if short_title:
+                rename_conversation(current["id"], st.session_state.chat_session_id, short_title)
         process_and_save_assistant_message(prompt)
         st.rerun()
 
