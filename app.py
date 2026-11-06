@@ -234,7 +234,7 @@ def process_and_save_assistant_message(message: str) -> None:
 
 
 def render_chat_page() -> None:
-    render_header("YOUR AI WORKSPACE", "AI Assistant", "Tell TaskBot what you need to get done. It can manage your tasks using natural language.")
+    render_header("", "AI Assistant", "Tell TaskBot what you need to get done. It can manage your tasks using natural language.")
     st.markdown('<div class="chat-intro"> <span class="online-dot"></span> TaskBot is ready to help</div>', unsafe_allow_html=True)
     suggestions = [
         ("＋  Add a task", "Add my project assignment for tomorrow"),
