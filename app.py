@@ -392,7 +392,16 @@ def render_history_page() -> None:
                         delete_conversation(conversation_id, session_id)
                         st.session_state.pop("confirm_chat_delete_" + str(conversation_id), None)
                         if st.session_state.current_conversation_id == conversation_id:
-                            start_new_conversation()
+                            # Create a fresh active chat without changing the already-rendered
+                            # navigation widget's state during this run.
+                            new_id = create_conversation(session_id)
+                            st.session_state.current_conversation_id = new_id
+                            first_message = {
+                                "role": "assistant", "content": WELCOME,
+                                "activity": [], "mode": "TaskBot",
+                            }
+                            st.session_state.messages = [first_message]
+                            save_conversation_message(new_id, session_id, first_message)
                         st.rerun()
                 with no_col:
                     if st.button("Cancel", key="confirm_chat_no_" + str(conversation_id)):
