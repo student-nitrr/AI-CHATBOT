@@ -30,6 +30,28 @@ def init_db() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT 'New conversation',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id INTEGER NOT NULL,
+                message_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+            )
+            """
+        )
         connection.commit()
 
 
@@ -199,3 +221,81 @@ def get_stats() -> dict[str, int]:
         "pending": int(pending),
         "completed": int(completed),
     }
+
+
+def create_conversation(session_id: str, title: str = "New conversation") -> int:
+    """Create a conversation owned by the current browser session."""
+    created_at = datetime.now().isoformat(timespec="seconds")
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "INSERT INTO conversations (session_id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (session_id, title.strip() or "New conversation", created_at, created_at),
+        )
+        connection.commit()
+        return int(cursor.lastrowid)
+
+
+def list_conversations(session_id: str) -> list[dict[str, Any]]:
+    with get_connection() as connection:
+        rows = connection.execute(
+            "SELECT id, title, created_at, updated_at FROM conversations WHERE session_id = ? ORDER BY updated_at DESC, id DESC",
+            (session_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_conversation_messages(conversation_id: int, session_id: str) -> list[dict[str, Any]]:
+    import json
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """SELECT m.message_json FROM conversation_messages m
+               JOIN conversations c ON c.id = m.conversation_id
+               WHERE m.conversation_id = ? AND c.session_id = ?
+               ORDER BY m.id""",
+            (conversation_id, session_id),
+        ).fetchall()
+    return [json.loads(row["message_json"]) for row in rows]
+
+
+def save_conversation_message(conversation_id: int, session_id: str, message: dict[str, Any]) -> None:
+    import json
+
+    now = datetime.now().isoformat(timespec="seconds")
+    with get_connection() as connection:
+        owned = connection.execute(
+            "SELECT id FROM conversations WHERE id = ? AND session_id = ?",
+            (conversation_id, session_id),
+        ).fetchone()
+        if owned is None:
+            raise ValueError("Conversation not found.")
+        connection.execute(
+            "INSERT INTO conversation_messages (conversation_id, message_json, created_at) VALUES (?, ?, ?)",
+            (conversation_id, json.dumps(message, ensure_ascii=False), now),
+        )
+        connection.execute(
+            "UPDATE conversations SET updated_at = ? WHERE id = ?",
+            (now, conversation_id),
+        )
+        connection.commit()
+
+
+def rename_conversation(conversation_id: int, session_id: str, title: str) -> None:
+    clean_title = title.strip()[:80]
+    if not clean_title:
+        raise ValueError("Conversation name cannot be empty.")
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ? AND session_id = ?",
+            (clean_title, datetime.now().isoformat(timespec="seconds"), conversation_id, session_id),
+        )
+        connection.commit()
+
+
+def delete_conversation(conversation_id: int, session_id: str) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            "DELETE FROM conversations WHERE id = ? AND session_id = ?",
+            (conversation_id, session_id),
+        )
+        connection.commit()
