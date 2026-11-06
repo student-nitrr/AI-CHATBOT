@@ -444,7 +444,7 @@ def render_overview_page() -> None:
 
 
 def render_about_page() -> None:
-    render_header("BEHIND THE ASSISTANT", "How TaskBot works", "A conversational task manager powered by AI function calling and a local SQLite database.")
+    render_header("", "How TaskBot works", "A conversational task manager powered by AI function calling and a local SQLite database.")
     steps = [
         ("01", "Understand", "TaskBot reads your natural-language message and identifies what you want to do."),
         ("02", "Choose a tool", "The AI selects add_task, list_tasks, complete_task, or delete_task when needed."),
