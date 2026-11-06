@@ -289,7 +289,7 @@ def render_task_card(task: dict) -> None:
 
 
 def render_tasks_page() -> None:
-    render_header("STAY ON TRACK", "My Tasks", "A clear view of everything on your plate.")
+    render_header("", "My Tasks", "A clear view of everything on your plate.")
     tasks = list_tasks("All")
     left, right = st.columns([2, 1])
     with left:
